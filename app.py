@@ -72,10 +72,6 @@ if not pnl_file and not bs_file and not td_file:
 
 # --- OPTIMIZED DATA LOADERS ---
 @st.cache_data
-data_format = lambda x: x
-
-
-@st.cache_data
 def load_pnl(file):
   try:
     df = pd.read_excel(file, sheet_name=0)
@@ -153,7 +149,7 @@ df_pnl = load_pnl(pnl_file) if pnl_file else None
 df_bs = load_bs(bs_file) if bs_file else None
 df_td = load_td(td_file) if td_file else None
 
-# --- SIDEBAR DYNAMIC FILTERS (Active only when TD is loaded) ---
+# --- SIDEBAR DYNAMIC FILTERS ---
 selected_year = 2026
 selected_ledger = "All Accounts"
 selected_vendor = "All Vendors"
