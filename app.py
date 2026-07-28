@@ -166,23 +166,52 @@ if not pnl_file and not bs_file and not td_file:
 def load_pnl(file):
   try:
     df = pd.read_excel(file, header=None)
-    df_data = df.iloc[6:].copy()
-    df_data.columns = ["Category", "YTD_2026", "YTD_2025"]
+
+    # Automatically find the header row containing 'Category' or 'Account'
+    header_row_idx = None
+    for idx, row in df.iterrows():
+      row_str = row.astype(str).str.lower().values
+      if any("category" in s or "account" in s for s in row_str):
+        header_row_idx = idx
+        break
+
+    if header_row_idx is None:
+      header_row_idx = 5
+
+    df_data = df.iloc[header_row_idx + 1 :].copy()
+
+    if df_data.shape[1] >= 3:
+      df_data = df_data.iloc[:, [0, 1, 2]]
+      df_data.columns = ["Category", "YTD_2026", "YTD_2025"]
+    elif df_data.shape[1] == 2:
+      df_data.columns = ["Category", "YTD_2026"]
+      df_data["YTD_2025"] = 0.0
+    else:
+      return None
+
     df_data = df_data.dropna(subset=["Category"])
     df_data = df_data[
         ~df_data["Category"]
         .astype(str)
-        .str.contains("Accrual Basis|Cash Basis|Prepared", case=False, na=False)
+        .str.contains(
+            "Accrual Basis|Cash Basis|Prepared|Table|Report",
+            case=False,
+            na=False,
+        )
     ]
+
     for col in ["YTD_2026", "YTD_2025"]:
-      df_data[col] = (
-          df_data[col]
-          .astype(str)
-          .str.replace(",", "")
-          .str.replace("$", "")
-          .str.replace("—", "0")
-      )
-      df_data[col] = pd.to_numeric(df_data[col], errors="coerce").fillna(0.0)
+      if col in df_data.columns:
+        df_data[col] = (
+            df_data[col]
+            .astype(str)
+            .str.replace(",", "")
+            .str.replace("$", "")
+            .str.replace("—", "0")
+            .str.strip()
+        )
+        df_data[col] = pd.to_numeric(df_data[col], errors="coerce").fillna(0.0)
+
     return df_data
   except Exception as e:
     st.error(f"Error loading P&L: {e}")
@@ -380,42 +409,51 @@ st.divider()
 st.subheader("📈 Profit & Loss Comparison & YoY Variance Analysis")
 
 if df_pnl is not None:
+  exclude_keywords = (
+      "Total|Income|Expenses|Profit|Net|Gross|Operating|Earnings"
+  )
   pnl_chart_df = df_pnl[
-      ~df_pnl["Category"].str.contains(
-          "Total|Income|Expenses|Profit|Net", case=True, na=False
-      )
+      ~df_pnl["Category"].astype(str).str.contains(exclude_keywords, case=True)
   ]
   pnl_chart_df = pnl_chart_df[
-      (pnl_chart_df["YTD_2026"] > 0) | (pnl_chart_df["YTD_2025"] > 0)
+      (pnl_chart_df["YTD_2026"] != 0) | (pnl_chart_df["YTD_2025"] != 0)
   ]
 
   p1, p2 = st.columns(2)
   with p1:
-    fig_pnl_top = px.bar(
-        pnl_chart_df.sort_values(by="YTD_2026", ascending=False).head(10),
-        x="YTD_2026",
-        y="Category",
-        orientation="h",
-        title="Top P&L Accounts (YTD 2026)",
-        labels={"YTD_2026": "Amount ($)", "Category": "Account"},
-        color="YTD_2026",
-        color_continuous_scale="Blues",
-    )
-    fig_pnl_top.update_layout(yaxis={"categoryorder": "total ascending"})
-    st.plotly_chart(fig_pnl_top, use_container_width=True)
+    if not pnl_chart_df.empty:
+      top_pnl = (
+          pnl_chart_df.sort_values(by="YTD_2026", ascending=False)
+          .head(10)
+          .copy()
+      )
+      fig_pnl_top = px.bar(
+          top_pnl,
+          x="YTD_2026",
+          y="Category",
+          orientation="h",
+          title="Top P&L Line-Item Accounts (YTD 2026)",
+          labels={"YTD_2026": "Amount ($)", "Category": "Account"},
+          color="YTD_2026",
+          color_continuous_scale="Blues",
+      )
+      fig_pnl_top.update_layout(yaxis={"categoryorder": "total ascending"})
+      st.plotly_chart(fig_pnl_top, use_container_width=True)
+    else:
+      st.info("No individual line items available for charting.")
 
   with p2:
     display_pnl = df_pnl.copy()
-    display_pnl["Variance ($)"] = (
-        display_pnl["YTD_2026"] - display_pnl["YTD_2025"]
-    )
-    display_pnl["Variance (%)"] = (
-        (display_pnl["Variance ($)"] / display_pnl["YTD_2025"].replace(0, 1))
-        * 100
-    ).round(1)
+    if "YTD_2025" in display_pnl.columns and "YTD_2026" in display_pnl.columns:
+      display_pnl["Variance ($)"] = (
+          display_pnl["YTD_2026"] - display_pnl["YTD_2025"]
+      )
+      display_pnl["Variance (%)"] = (
+          (display_pnl["Variance ($)"] / display_pnl["YTD_2025"].replace(0, 1))
+          * 100
+      ).round(1)
 
     st.markdown("**Complete P&L Comparative Statement (2026 vs 2025)**")
-    # Rendered as safe HTML to prevent any Streamlit frontend websocket/table bugs
     st.markdown(
         display_pnl.to_html(index=False, classes="table table-striped"),
         unsafe_allow_html=True,
