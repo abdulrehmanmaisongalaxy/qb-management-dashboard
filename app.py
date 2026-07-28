@@ -44,7 +44,6 @@ with st.sidebar.form("upload_form"):
       "🚀 Process & Load Dashboard", type="primary", use_container_width=True
   )
 
-# Store in session state upon form submission
 if submitted:
   if uploaded_pnl is not None:
     st.session_state["pnl_file"] = uploaded_pnl
@@ -70,18 +69,14 @@ if not pnl_file and not bs_file and not td_file:
 def load_pnl(file):
   try:
     df = pd.read_excel(file, header=None)
-    # QuickBooks P&L raw export: data starts at row 6
     df_data = df.iloc[6:].copy()
     df_data.columns = ["Category", "YTD_2026", "YTD_2025"]
     df_data = df_data.dropna(subset=["Category"])
-
-    # Filter out QuickBooks footer metadata rows (e.g., 'Accrual Basis...')
     df_data = df_data[
         ~df_data["Category"]
         .astype(str)
         .str.contains("Accrual Basis|Cash Basis|Prepared", case=False, na=False)
     ]
-
     for col in ["YTD_2026", "YTD_2025"]:
       df_data[col] = (
           df_data[col]
@@ -115,7 +110,6 @@ def load_bs(file):
         .astype(str)
         .str.contains("Accrual Basis|Cash Basis|Prepared", case=False, na=False)
     ]
-
     df_data["Balance"] = (
         df_data["Balance"]
         .astype(str)
@@ -135,45 +129,50 @@ def load_bs(file):
 @st.cache_data
 def load_td(file):
   try:
-    df = pd.read_excel(file, skiprows=4)
-    df.columns = [str(col).strip() for col in df.columns]
-    account_col = df.columns[0]
-    df["Ledger Name"] = df[account_col].ffill()
+    df = pd.read_excel(file, header=None)
+    # Transaction detail layout: headers on row 4, data starts at row 5
+    df_data = df.iloc[5:].copy()
+    df_data.columns = [str(col).strip() for col in df.iloc[4].values]
+    df_data = df_data.dropna(how="all")
+
+    # Forward fill the ledger account name from column 0
+    account_col = df_data.columns[0]
+    df_data["Ledger Name"] = df_data[account_col].ffill()
 
     date_col = next(
-        (col for col in df.columns if "date" in str(col).lower()), None
+        (col for col in df_data.columns if "date" in str(col).lower()), None
     )
     amount_col = next(
-        (col for col in df.columns if "amount" in str(col).lower()), None
+        (col for col in df_data.columns if "amount" in str(col).lower()), None
     )
 
     if not date_col or not amount_col:
       return None
 
-    df = df.dropna(subset=[date_col])
-    df["Date"] = pd.to_datetime(df[date_col], errors="coerce")
-    df = df.dropna(subset=["Date"])
+    df_data = df_data.dropna(subset=[date_col])
+    df_data["Date"] = pd.to_datetime(df_data[date_col], errors="coerce")
+    df_data = df_data.dropna(subset=["Date"])
 
-    df["Amount"] = (
-        df[amount_col]
+    df_data["Amount"] = (
+        df_data[amount_col]
         .astype(str)
         .str.replace(",", "")
         .str.replace("$", "")
         .astype(float)
     )
-    df["Year"] = df["Date"].dt.year
-    df["Month-Year"] = df["Date"].dt.to_period("M").astype(str)
+    df_data["Year"] = df_data["Date"].dt.year
+    df_data["Month-Year"] = df_data["Date"].dt.to_period("M").astype(str)
 
     for col, default_val in [
         ("Name", "Unassigned"),
         ("Transaction type", "General"),
     ]:
-      if col not in df.columns:
-        df[col] = default_val
+      if col not in df_data.columns:
+        df_data[col] = default_val
       else:
-        df[col] = df[col].fillna(default_val)
+        df_data[col] = df_data[col].fillna(default_val)
 
-    return df
+    return df_data
   except Exception as e:
     st.error(f"Error loading Transaction Detail: {e}")
     return None
