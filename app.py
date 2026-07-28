@@ -22,41 +22,36 @@ st.markdown(
 )
 st.divider()
 
-# --- SIDEBAR FILE UPLOADS & CONTROLS ---
+# --- SIDEBAR FORM FOR UPLOADS (Prevents mid-upload refreshes) ---
 st.sidebar.image(
     "https://img.icons8.com/color/96/combo-chart--v1.png", width=60
 )
 st.sidebar.header("Reports Management")
 
-st.sidebar.markdown(
-    "1. Upload your 3 QuickBooks reports below.  \n2. Click **'Process & Load"
-    " Dashboard'**."
-)
+with st.sidebar.form("upload_form"):
+  st.markdown("Upload all 3 QuickBooks reports below:")
+  uploaded_pnl = st.file_uploader(
+      "Profit & Loss Comparison (.xlsx)", type=["xlsx", "xls"], key="pnl_in"
+  )
+  uploaded_bs = st.file_uploader(
+      "Balance Sheet (.xlsx)", type=["xlsx", "xls"], key="bs_in"
+  )
+  uploaded_td = st.file_uploader(
+      "Transaction Detail (.xlsx)", type=["xlsx", "xls"], key="td_in"
+  )
 
-uploaded_pnl = st.sidebar.file_uploader(
-    "Upload Profit & Loss Comparison (.xlsx)",
-    type=["xlsx", "xls"],
-    key="pnl_in",
-)
-uploaded_bs = st.sidebar.file_uploader(
-    "Upload Balance Sheet (.xlsx)", type=["xlsx", "xls"], key="bs_in"
-)
-uploaded_td = st.sidebar.file_uploader(
-    "Upload Transaction Detail (.xlsx)", type=["xlsx", "xls"], key="td_in"
-)
+  submitted = st.form_submit_button(
+      "🚀 Process & Load Dashboard", type="primary", use_container_width=True
+  )
 
-st.sidebar.divider()
-process_btn = st.sidebar.button(
-    "🚀 Process & Load Dashboard", type="primary", use_container_width=True
-)
-
-# Manage state so data persists cleanly
-if uploaded_pnl is not None:
-  st.session_state["pnl_file"] = uploaded_pnl
-if uploaded_bs is not None:
-  st.session_state["bs_file"] = uploaded_bs
-if uploaded_td is not None:
-  st.session_state["td_file"] = uploaded_td
+# Store in session state upon form submission
+if submitted:
+  if uploaded_pnl is not None:
+    st.session_state["pnl_file"] = uploaded_pnl
+  if uploaded_bs is not None:
+    st.session_state["bs_file"] = uploaded_bs
+  if uploaded_td is not None:
+    st.session_state["td_file"] = uploaded_td
 
 pnl_file = st.session_state.get("pnl_file", None)
 bs_file = st.session_state.get("bs_file", None)
@@ -65,7 +60,7 @@ td_file = st.session_state.get("td_file", None)
 if not pnl_file and not bs_file and not td_file:
   st.info(
       "👋 **Welcome CFO!** Please upload your QuickBooks reports in the sidebar"
-      " and click **'Process & Load Dashboard'**."
+      " form and click **'Process & Load Dashboard'**."
   )
   st.stop()
 
