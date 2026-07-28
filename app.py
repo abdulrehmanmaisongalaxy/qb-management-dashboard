@@ -22,56 +22,50 @@ st.markdown(
 )
 st.divider()
 
-# --- SIDEBAR FILE UPLOADS ---
+# --- SIDEBAR MULTI-FILE UPLOAD & CONTROLS ---
 st.sidebar.image(
     "https://img.icons8.com/color/96/combo-chart--v1.png", width=60
 )
 st.sidebar.header("Reports Management")
 
 st.sidebar.markdown(
-    "Upload your QuickBooks reports below. Use the button at the bottom once"
-    " ready."
+    "Upload your 3 QuickBooks reports. The dashboard will process them"
+    " instantly."
 )
 
-uploaded_pnl = st.sidebar.file_uploader(
-    "1️⃣ Upload Profit & Loss Comparison (.xlsx)",
+uploaded_files = st.sidebar.file_uploader(
+    "Upload QuickBooks Reports (Select all 3: P&L, Balance Sheet, Transaction"
+    " Detail)",
     type=["xlsx", "xls"],
-    key="pnl",
-)
-uploaded_bs = st.sidebar.file_uploader(
-    "2️⃣ Upload Balance Sheet (.xlsx)", type=["xlsx", "xls"], key="bs"
-)
-uploaded_td = st.sidebar.file_uploader(
-    "3️⃣ Upload Transaction Detail (.xlsx)", type=["xlsx", "xls"], key="td"
+    accept_multiple_files=True,
+    key="qb_reports",
 )
 
-# Save to Session State safely without triggering instant re-run crashes
-if uploaded_pnl is not None:
-  st.session_state["pnl_file"] = uploaded_pnl
-if uploaded_bs is not None:
-  st.session_state["bs_file"] = uploaded_bs
-if uploaded_td is not None:
-  st.session_state["td_file"] = uploaded_td
+# Map uploaded files by name
+pnl_file, bs_file, td_file = None, None, None
+if uploaded_files:
+  for f in uploaded_files:
+    fname = f.name.lower()
+    if "profit" in fname or "loss" in fname or "p&l" in fname:
+      pnl_file = f
+    elif "balance" in fname or "sheet" in fname:
+      bs_file = f
+    elif "transaction" in fname or "detail" in fname or "ledger" in fname:
+      td_file = f
 
 st.sidebar.divider()
-launch_app = st.sidebar.button(
-    "🚀 Launch / Refresh Dashboard", type="primary", use_container_width=True
-)
 
-# Check if we have files in session state
-pnl_file = st.session_state.get("pnl_file", None)
-bs_file = st.session_state.get("bs_file", None)
-td_file = st.session_state.get("td_file", None)
-
-if not pnl_file and not td_file and not bs_file and not launch_app:
+if not uploaded_files:
   st.info(
-      "👋 **Welcome CFO!** Please upload your QuickBooks reports in the sidebar"
-      " and click **'Launch / Refresh Dashboard'**."
+      "👋 **Welcome CFO!** Please upload your QuickBooks reports (`Profit and"
+      " Loss Comparison.xlsx`, `Balance Sheet.xlsx`, and `Transaction Detail by"
+      " Account.xlsx`) using the sidebar uploader above to launch the"
+      " executive dashboard."
   )
   st.stop()
 
 
-# --- DATA LOADERS WITH ROBUST ERROR HANDLING ---
+# --- DATA LOADERS ---
 @st.cache_data
 def load_pnl_data(file):
   try:
@@ -147,13 +141,41 @@ def load_transaction_data(file):
     return None
 
 
-# Load datasets
-df_td = load_transaction_data(td_file) if td_file else None
 df_pnl = load_pnl_data(pnl_file) if pnl_file else None
 df_bs = load_bs_data(bs_file) if bs_file else None
+df_td = load_transaction_data(td_file) if td_file else None
+
+# --- SIDEBAR DYNAMIC FILTERS ---
+st.sidebar.subheader("🔍 CFO Filter Controls")
+selected_year = 2026
+selected_ledger = "All Accounts"
+selected_vendor = "All Vendors"
+
+if df_td is not None:
+  years = sorted(df_td["Year"].unique(), reverse=True)
+  selected_year = st.sidebar.selectbox("Reporting Year", years)
+  df_filtered_td = df_td[df_td["Year"] == selected_year]
+
+  ledgers = ["All Accounts"] + sorted(
+      df_filtered_td["Ledger Name"].astype(str).unique().tolist()
+  )
+  selected_ledger = st.sidebar.selectbox("Filter by Ledger Account", ledgers)
+  if selected_ledger != "All Accounts":
+    df_filtered_td = df_filtered_td[
+        df_filtered_td["Ledger Name"] == selected_ledger
+    ]
+
+  vendors = ["All Vendors"] + sorted(
+      df_filtered_td["Name"].astype(str).unique().tolist()
+  )
+  selected_vendor = st.sidebar.selectbox("Filter by Vendor / Payee", vendors)
+  if selected_vendor != "All Vendors":
+    df_filtered_td = df_filtered_td[df_filtered_td["Name"] == selected_vendor]
+else:
+  df_filtered_td = None
 
 # --- EXECUTIVE FINANCIAL KPIS ---
-st.subheader("📌 Executive Financial Position & Performance")
+st.subheader(f"📌 Executive Financial Position & Performance ({selected_year})")
 
 col1, col2, col3, col4, col5 = st.columns(5)
 
@@ -207,9 +229,9 @@ with col2:
   )
 with col3:
   st.metric(
-      label="Operating Cash Position",
+      label="Cash & Bank Position",
       value="$473,065.26",
-      delta="Bank & Savings",
+      delta="Checking & Savings",
   )
 with col4:
   st.metric(
@@ -262,23 +284,16 @@ if df_pnl is not None:
     st.markdown("**Complete P&L Comparative Statement (2026 vs 2025)**")
     st.dataframe(display_pnl, use_container_width=True)
 else:
-  st.info(
-      "Upload `Profit and Loss Comparison.xlsx` in the sidebar to view P&L"
-      " analytics."
-  )
+  st.info("Please upload `Profit and Loss Comparison.xlsx`.")
 
 st.divider()
 
 # --- SECTION 2: TRANSACTION LEVEL EXPENSE & CASHFLOW DYNAMICS ---
-if df_td is not None:
-  st.subheader("📉 Expense Analysis & Cashflow Monitoring (Transaction Level)")
+if df_filtered_td is not None:
+  st.subheader("📉 Expense Analysis & Cashflow Monitoring (Filtered)")
 
-  years = sorted(df_td["Year"].unique(), reverse=True)
-  selected_year = st.sidebar.selectbox("Select Transaction Year", years)
-  df_filtered = df_td[df_td["Year"] == selected_year]
-
-  income_df = df_filtered[df_filtered["Amount"] > 0]
-  expense_df = df_filtered[df_filtered["Amount"] < 0]
+  income_df = df_filtered_td[df_filtered_td["Amount"] > 0]
+  expense_df = df_filtered_td[df_filtered_td["Amount"] < 0]
 
   e1, e2 = st.columns(2)
   with e1:
@@ -291,7 +306,7 @@ if df_td is not None:
         x="Amount",
         y="Name",
         orientation="h",
-        title=f"Top 10 Vendors / Payees ({selected_year})",
+        title=f"Top Payees / Vendors ({selected_year})",
         labels={"Amount": "Total Outflow ($)", "Name": "Vendor Name"},
         color="Amount",
         color_continuous_scale="Reds",
@@ -323,15 +338,12 @@ if df_td is not None:
     )
     st.plotly_chart(fig_cf, use_container_width=True)
 
-  with st.expander("📋 View Detailed Transaction Ledger"):
-    st.dataframe(df_filtered, use_container_width=True)
+  with st.expander("📋 View Detailed Filtered Transaction Ledger"):
+    st.dataframe(df_filtered_td, use_container_width=True)
 else:
-  st.info(
-      "Upload `Transaction Detail by Account.xlsx` in the sidebar to view"
-      " transaction analytics."
-  )
+  st.info("Please upload `Transaction Detail by Account.xlsx`.")
 
 # --- SECTION 3: BALANCE SHEET VIEWER ---
 if df_bs is not None:
-  with st.expander("🏛️ View Balance Sheet Report"):
+  with st.expander("🏛️ View Full Balance Sheet Report"):
     st.dataframe(df_bs, use_container_width=True)
