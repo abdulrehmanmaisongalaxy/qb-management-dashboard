@@ -65,32 +65,57 @@ if not pnl_file and not bs_file and not td_file:
   st.stop()
 
 
-# --- OPTIMIZED DATA LOADERS ---
+# --- ROBUST QUICKBOOKS DATA LOADERS ---
 @st.cache_data
 def load_pnl(file):
   try:
-    df = pd.read_excel(file, sheet_name=0)
-    df.columns = ["Category", "YTD_2026", "YTD_2025"]
-    df = df.dropna(subset=["Category"])
+    df = pd.read_excel(file, header=None)
+    # QuickBooks P&L raw export: data starts at row 6
+    df_data = df.iloc[6:].copy()
+    df_data.columns = ["Category", "YTD_2026", "YTD_2025"]
+    df_data = df_data.dropna(subset=["Category"])
     for col in ["YTD_2026", "YTD_2025"]:
-      df[col] = (
-          df[col]
+      df_data[col] = (
+          df_data[col]
           .astype(str)
           .str.replace(",", "")
           .str.replace("$", "")
           .str.replace("—", "0")
       )
-      df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
-    return df
-  except Exception:
+      df_data[col] = pd.to_numeric(df_data[col], errors="coerce").fillna(0.0)
+    return df_data
+  except Exception as e:
+    st.error(f"Error loading P&L: {e}")
     return None
 
 
 @st.cache_data
 def load_bs(file):
   try:
-    return pd.read_excel(file, sheet_name=0)
-  except Exception:
+    df = pd.read_excel(file, header=None)
+    # QuickBooks Balance Sheet raw export: data starts at row 4 or 5
+    df_data = df.iloc[4:].copy()
+    if df_data.shape[1] >= 2:
+      df_data = df_data.iloc[:, [0, 1]]
+      df_data.columns = ["Account", "Balance"]
+    else:
+      df_data.columns = ["Account"]
+      df_data["Balance"] = 0.0
+
+    df_data = df_data.dropna(subset=["Account"])
+    df_data["Balance"] = (
+        df_data["Balance"]
+        .astype(str)
+        .str.replace(",", "")
+        .str.replace("$", "")
+        .str.replace("—", "0")
+    )
+    df_data["Balance"] = pd.to_numeric(
+        df_data["Balance"], errors="coerce"
+    ).fillna(0.0)
+    return df_data
+  except Exception as e:
+    st.error(f"Error loading Balance Sheet: {e}")
     return None
 
 
@@ -136,7 +161,8 @@ def load_td(file):
         df[col] = df[col].fillna(default_val)
 
     return df
-  except Exception:
+  except Exception as e:
+    st.error(f"Error loading Transaction Detail: {e}")
     return None
 
 
