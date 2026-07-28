@@ -74,6 +74,14 @@ def load_pnl(file):
     df_data = df.iloc[6:].copy()
     df_data.columns = ["Category", "YTD_2026", "YTD_2025"]
     df_data = df_data.dropna(subset=["Category"])
+
+    # Filter out QuickBooks footer metadata rows (e.g., 'Accrual Basis...')
+    df_data = df_data[
+        ~df_data["Category"]
+        .astype(str)
+        .str.contains("Accrual Basis|Cash Basis|Prepared", case=False, na=False)
+    ]
+
     for col in ["YTD_2026", "YTD_2025"]:
       df_data[col] = (
           df_data[col]
@@ -93,7 +101,6 @@ def load_pnl(file):
 def load_bs(file):
   try:
     df = pd.read_excel(file, header=None)
-    # QuickBooks Balance Sheet raw export: data starts at row 4 or 5
     df_data = df.iloc[4:].copy()
     if df_data.shape[1] >= 2:
       df_data = df_data.iloc[:, [0, 1]]
@@ -103,6 +110,12 @@ def load_bs(file):
       df_data["Balance"] = 0.0
 
     df_data = df_data.dropna(subset=["Account"])
+    df_data = df_data[
+        ~df_data["Account"]
+        .astype(str)
+        .str.contains("Accrual Basis|Cash Basis|Prepared", case=False, na=False)
+    ]
+
     df_data["Balance"] = (
         df_data["Balance"]
         .astype(str)
