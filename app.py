@@ -22,11 +22,107 @@ st.markdown(
 )
 st.divider()
 
-# --- SIDEBAR FORM FOR UPLOADS (Prevents mid-upload refreshes) ---
+
+# --- HELPER: GENERATE DOWNLOADABLE TEMPLATE ---
+def generate_sample_template():
+  output = io.BytesIO()
+  with pd.ExcelWriter(output, engine="openpyxl") as writer:
+    # 1. PNL Sheet template
+    pnl_df = pd.DataFrame([
+        ["Social Investment Managers & Advisors LLC", "", ""],
+        ["Profit & Loss Comparison", "", ""],
+        ["For the period ended", "", ""],
+        ["", "", ""],
+        ["Accrual Basis", "", ""],
+        ["Category", "YTD_2026", "YTD_2025"],
+        ["Income", 0.0, 0.0],
+        ["Consulting Income", 203434.33, 50704.00],
+        ["Grant Income", 218750.00, 348147.56],
+        ["Total for Income", 2346698.70, 2186202.95],
+        ["Gross Profit", 2346698.70, 2186202.95],
+        ["Expenses", 0.0, 0.0],
+        ["Software Expenses", 1578.89, 74.99],
+        ["Employee Salaries", 1282550.36, 1180557.52],
+        ["Total for Expenses", 1701154.83, 1753331.46],
+        ["Net Income", 550493.78, 207973.99],
+    ])
+    pnl_df.to_excel(
+        writer, sheet_name="Profit and Loss Comparison", index=False, header=False
+    )
+
+    # 2. Balance Sheet template
+    bs_df = pd.DataFrame([
+        ["Social Investment Managers & Advisors LLC", ""],
+        ["Balance Sheet", ""],
+        ["As of July 2026", ""],
+        ["", ""],
+        ["Account", "Balance"],
+        ["Checking & Savings", 473065.26],
+        ["Total Assets", 4945329.85],
+        ["Total Equity", 3325415.33],
+    ])
+    bs_df.to_excel(
+        writer, sheet_name="Balance Sheet", index=False, header=False
+    )
+
+    # 3. Transaction Detail template
+    td_df = pd.DataFrame([
+        ["Social Investment Managers & Advisors LLC", "", "", "", "", ""],
+        ["Transaction Detail by Account", "", "", "", "", ""],
+        ["January - July 2026", "", "", "", "", ""],
+        ["", "", "", "", "", ""],
+        [
+            "Account",
+            "Date",
+            "Transaction type",
+            "Name",
+            "Memo/Description",
+            "Amount",
+        ],
+        [
+            "Consulting Income",
+            "2026-01-15",
+            "Invoice",
+            "Client A",
+            "Project milestone",
+            50000.00,
+        ],
+        [
+            "Software Expenses",
+            "2026-02-10",
+            "Bill",
+            "Vendor X",
+            "Cloud hosting",
+            -2500.00,
+        ],
+    ])
+    td_df.to_excel(
+        writer, sheet_name="Transaction Detail", index=False, header=False
+    )
+
+  output.seek(0)
+  return output.getvalue()
+
+
+# --- SIDEBAR FORM FOR UPLOADS & TEMPLATE DOWNLOAD ---
 st.sidebar.image(
     "https://img.icons8.com/color/96/combo-chart--v1.png", width=60
 )
 st.sidebar.header("Reports Management")
+
+# Download template button
+template_bytes = generate_sample_template()
+st.sidebar.download_button(
+    label="📥 Download Standard Template",
+    data=template_bytes,
+    file_name="CFO_Dashboard_Template.xlsx",
+    mime=(
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    ),
+    help="Download this template, fill in your data, and upload the files below.",
+)
+
+st.sidebar.divider()
 
 with st.sidebar.form("upload_form"):
   st.markdown("Upload all 3 QuickBooks reports below:")
@@ -58,8 +154,9 @@ td_file = st.session_state.get("td_file", None)
 
 if not pnl_file and not bs_file and not td_file:
   st.info(
-      "👋 **Welcome CFO!** Please upload your QuickBooks reports in the sidebar"
-      " form and click **'Process & Load Dashboard'**."
+      "👋 **Welcome CFO!** Download the standard template above, populate your"
+      " numbers, upload them in the sidebar form, and click **'Process & Load"
+      " Dashboard'**."
   )
   st.stop()
 
@@ -130,12 +227,10 @@ def load_bs(file):
 def load_td(file):
   try:
     df = pd.read_excel(file, header=None)
-    # Transaction detail layout: headers on row 4, data starts at row 5
     df_data = df.iloc[5:].copy()
     df_data.columns = [str(col).strip() for col in df.iloc[4].values]
     df_data = df_data.dropna(how="all")
 
-    # Forward fill the ledger account name from column 0
     account_col = df_data.columns[0]
     df_data["Ledger Name"] = df_data[account_col].ffill()
 
@@ -320,7 +415,6 @@ if df_pnl is not None:
     ).round(1)
 
     st.markdown("**Complete P&L Comparative Statement (2026 vs 2025)**")
-    # Using st.table instead of st.dataframe avoids the frontend websocket sync error completely
     st.table(display_pnl)
 else:
   st.info("Upload Profit & Loss report to view analytics.")
