@@ -415,7 +415,11 @@ if df_pnl is not None:
     ).round(1)
 
     st.markdown("**Complete P&L Comparative Statement (2026 vs 2025)**")
-    st.table(display_pnl)
+    # Rendered as safe HTML to prevent any Streamlit frontend websocket/table bugs
+    st.markdown(
+        display_pnl.to_html(index=False, classes="table table-striped"),
+        unsafe_allow_html=True,
+    )
 else:
   st.info("Upload Profit & Loss report to view analytics.")
 
@@ -474,11 +478,17 @@ if df_filtered_td is not None:
     st.plotly_chart(fig_cf, use_container_width=True)
 
   with st.expander("📋 View Detailed Filtered Transaction Ledger"):
-    st.dataframe(df_filtered_td, use_container_width=True)
+    st.markdown(
+        df_filtered_td.to_html(index=False, classes="table table-striped"),
+        unsafe_allow_html=True,
+    )
 else:
   st.info("Upload Transaction Detail report to view cashflow analytics.")
 
 # --- SECTION 3: BALANCE SHEET VIEWER ---
 if df_bs is not None:
   with st.expander("🏛️ View Full Balance Sheet Report"):
-    st.dataframe(df_bs, use_container_width=True)
+    st.markdown(
+        df_bs.to_html(index=False, classes="table table-striped"),
+        unsafe_allow_html=True,
+    )
