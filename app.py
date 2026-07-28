@@ -28,6 +28,11 @@ st.sidebar.image(
 )
 st.sidebar.header("Reports Management")
 
+st.sidebar.markdown(
+    "Upload your QuickBooks reports below. Use the button at the bottom once"
+    " ready."
+)
+
 uploaded_pnl = st.sidebar.file_uploader(
     "1️⃣ Upload Profit & Loss Comparison (.xlsx)",
     type=["xlsx", "xls"],
@@ -40,28 +45,33 @@ uploaded_td = st.sidebar.file_uploader(
     "3️⃣ Upload Transaction Detail (.xlsx)", type=["xlsx", "xls"], key="td"
 )
 
-# Persistent Session State
-if uploaded_pnl:
+# Save to Session State safely without triggering instant re-run crashes
+if uploaded_pnl is not None:
   st.session_state["pnl_file"] = uploaded_pnl
-if uploaded_bs:
+if uploaded_bs is not None:
   st.session_state["bs_file"] = uploaded_bs
-if uploaded_td:
+if uploaded_td is not None:
   st.session_state["td_file"] = uploaded_td
 
+st.sidebar.divider()
+launch_app = st.sidebar.button(
+    "🚀 Launch / Refresh Dashboard", type="primary", use_container_width=True
+)
+
+# Check if we have files in session state
 pnl_file = st.session_state.get("pnl_file", None)
 bs_file = st.session_state.get("bs_file", None)
 td_file = st.session_state.get("td_file", None)
 
-if not td_file and not pnl_file:
+if not pnl_file and not td_file and not bs_file and not launch_app:
   st.info(
       "👋 **Welcome CFO!** Please upload your QuickBooks reports in the sidebar"
-      " (Transaction Detail, P&L Comparison, and Balance Sheet) to launch the"
-      " executive dashboard."
+      " and click **'Launch / Refresh Dashboard'**."
   )
   st.stop()
 
 
-# --- DATA LOADERS ---
+# --- DATA LOADERS WITH ROBUST ERROR HANDLING ---
 @st.cache_data
 def load_pnl_data(file):
   try:
@@ -78,7 +88,16 @@ def load_pnl_data(file):
       )
       df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
     return df
-  except Exception as e:
+  except Exception:
+    return None
+
+
+@st.cache_data
+def load_bs_data(file):
+  try:
+    df = pd.read_excel(file, sheet_name=0)
+    return df
+  except Exception:
     return None
 
 
@@ -124,13 +143,14 @@ def load_transaction_data(file):
         df[col] = df[col].fillna(default_val)
 
     return df
-  except Exception as e:
+  except Exception:
     return None
 
 
-# Load datasets if available
+# Load datasets
 df_td = load_transaction_data(td_file) if td_file else None
 df_pnl = load_pnl_data(pnl_file) if pnl_file else None
+df_bs = load_bs_data(bs_file) if bs_file else None
 
 # --- EXECUTIVE FINANCIAL KPIS ---
 st.subheader("📌 Executive Financial Position & Performance")
@@ -242,7 +262,10 @@ if df_pnl is not None:
     st.markdown("**Complete P&L Comparative Statement (2026 vs 2025)**")
     st.dataframe(display_pnl, use_container_width=True)
 else:
-  st.info("Upload `Profit and Loss Comparison.xlsx` to view P&L analytics.")
+  st.info(
+      "Upload `Profit and Loss Comparison.xlsx` in the sidebar to view P&L"
+      " analytics."
+  )
 
 st.divider()
 
@@ -302,3 +325,13 @@ if df_td is not None:
 
   with st.expander("📋 View Detailed Transaction Ledger"):
     st.dataframe(df_filtered, use_container_width=True)
+else:
+  st.info(
+      "Upload `Transaction Detail by Account.xlsx` in the sidebar to view"
+      " transaction analytics."
+  )
+
+# --- SECTION 3: BALANCE SHEET VIEWER ---
+if df_bs is not None:
+  with st.expander("🏛️ View Balance Sheet Report"):
+    st.dataframe(df_bs, use_container_width=True)
