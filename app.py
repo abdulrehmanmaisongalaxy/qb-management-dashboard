@@ -68,7 +68,6 @@ def load_pnl_data(file):
     df = pd.read_excel(file, sheet_name=0)
     df.columns = ["Category", "YTD_2026", "YTD_2025"]
     df = df.dropna(subset=["Category"])
-    # Clean numeric columns
     for col in ["YTD_2026", "YTD_2025"]:
       df[col] = (
           df[col]
@@ -138,18 +137,17 @@ st.subheader("📌 Executive Financial Position & Performance")
 
 col1, col2, col3, col4, col5 = st.columns(5)
 
-# Hardcoded or dynamically calculated executive summary metrics from P&L & BS
 total_rev_2026 = (
-    df_pnl[df_pnl["Category"].str.contains("Total for Income", case=Na=False)][
-        "YTD_2026"
-    ].values[0]
+    df_pnl[
+        df_pnl["Category"].str.contains("Total for Income", case=False, na=False)
+    ]["YTD_2026"].values[0]
     if df_pnl is not None
     else 2346698.70
 )
 total_rev_2025 = (
-    df_pnl[df_pnl["Category"].str.contains("Total for Income", case=Na=False)][
-        "YTD_2025"
-    ].values[0]
+    df_pnl[
+        df_pnl["Category"].str.contains("Total for Income", case=False, na=False)
+    ]["YTD_2025"].values[0]
     if df_pnl is not None
     else 2186202.95
 )
@@ -208,7 +206,6 @@ st.divider()
 st.subheader("📈 Profit & Loss Comparison & YoY Variance Analysis")
 
 if df_pnl is not None:
-  # Filter for major expense or income rows
   pnl_chart_df = df_pnl[
       ~df_pnl["Category"].str.contains(
           "Total|Income|Expenses|Profit|Net", case=True, na=False
@@ -234,7 +231,6 @@ if df_pnl is not None:
     st.plotly_chart(fig_pnl_top, use_container_width=True)
 
   with p2:
-    # Display full P&L table with variance
     display_pnl = df_pnl.copy()
     display_pnl["Variance ($)"] = (
         display_pnl["YTD_2026"] - display_pnl["YTD_2025"]
@@ -246,10 +242,7 @@ if df_pnl is not None:
     st.markdown("**Complete P&L Comparative Statement (2026 vs 2025)**")
     st.dataframe(display_pnl, use_container_width=True)
 else:
-  st.info(
-      "Upload `Profit and Loss Comparison.xlsx` to view detailed P&L variance"
-      " analytics."
-  )
+  st.info("Upload `Profit and Loss Comparison.xlsx` to view P&L analytics.")
 
 st.divider()
 
