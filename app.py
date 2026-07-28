@@ -309,7 +309,7 @@ if df_pnl is not None:
     fig_pnl_top.update_layout(yaxis={"categoryorder": "total ascending"})
     st.plotly_chart(fig_pnl_top, use_container_width=True)
 
-  with p2:
+ with p2:
     display_pnl = df_pnl.copy()
     display_pnl["Variance ($)"] = (
         display_pnl["YTD_2026"] - display_pnl["YTD_2025"]
@@ -318,8 +318,10 @@ if df_pnl is not None:
         (display_pnl["Variance ($)"] / display_pnl["YTD_2025"].replace(0, 1))
         * 100
     ).round(1)
+
     st.markdown("**Complete P&L Comparative Statement (2026 vs 2025)**")
-    st.dataframe(display_pnl, use_container_width=True)
+    # Using st.table instead of st.dataframe avoids the frontend websocket sync error completely
+    st.table(display_pnl)
 else:
   st.info("Upload Profit & Loss report to view analytics.")
 
