@@ -65,35 +65,43 @@ def generate_sample_template():
         writer, sheet_name="Balance Sheet", index=False, header=False
     )
 
-    # 3. Transaction Detail template
+    # 3. Updated Transaction Detail template (Matching your General Ledger schema)
     td_df = pd.DataFrame([
-        ["Social Investment Managers & Advisors LLC", "", "", "", "", ""],
-        ["Transaction Detail by Account", "", "", "", "", ""],
-        ["January - July 2026", "", "", "", "", ""],
-        ["", "", "", "", "", ""],
         [
-            "Account",
-            "Date",
+            "Classification",
+            "Distribution account",
+            "Transaction date",
             "Transaction type",
+            "Num",
             "Name",
-            "Memo/Description",
+            "Description",
+            "Split",
             "Amount",
+            "Balance",
         ],
         [
-            "Consulting Income",
-            "2026-01-15",
-            "Invoice",
-            "Client A",
-            "Project milestone",
-            50000.00,
+            "Asset",
+            "Chase Bank - Checking 0102",
+            "2026-01-02",
+            "Expense",
+            "",
+            "Javed Rizvi",
+            "Dividend 2025",
+            "Retained Earnings",
+            -17157.54,
+            83006.26,
         ],
         [
-            "Software Expenses",
-            "2026-02-10",
-            "Bill",
-            "Vendor X",
-            "Cloud hosting",
-            -2500.00,
+            "Expense",
+            "Advertising and Marketing",
+            "2026-01-14",
+            "Expense",
+            "",
+            "Mind Reflections",
+            "",
+            "Chase Bank - Checking 0102",
+            -483.13,
+            451597.01,
         ],
     ])
     td_df.to_excel(
@@ -110,7 +118,6 @@ st.sidebar.image(
 )
 st.sidebar.header("Reports Management")
 
-# Download template button
 template_bytes = generate_sample_template()
 st.sidebar.download_button(
     label="📥 Download Standard Template",
@@ -119,7 +126,10 @@ st.sidebar.download_button(
     mime=(
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     ),
-    help="Download this template, fill in your data, and upload the files below.",
+    help=(
+        "Download this template, fill in your data, and upload the files"
+        " below."
+    ),
 )
 
 st.sidebar.divider()
@@ -133,7 +143,7 @@ with st.sidebar.form("upload_form"):
       "Balance Sheet (.xlsx)", type=["xlsx", "xls"], key="bs_in"
   )
   uploaded_td = st.file_uploader(
-      "Transaction Detail (.xlsx)", type=["xlsx", "xls"], key="td_in"
+      "Transaction Detail / GL (.xlsx)", type=["xlsx", "xls"], key="td_in"
   )
 
   submitted = st.form_submit_button(
@@ -166,8 +176,6 @@ if not pnl_file and not bs_file and not td_file:
 def load_pnl(file):
   try:
     df = pd.read_excel(file, header=None)
-
-    # Automatically find the header row containing 'Category' or 'Account'
     header_row_idx = None
     for idx, row in df.iterrows():
       row_str = row.astype(str).str.lower().values
@@ -255,46 +263,52 @@ def load_bs(file):
 @st.cache_data
 def load_td(file):
   try:
-    df = pd.read_excel(file, header=None)
-    df_data = df.iloc[5:].copy()
-    df_data.columns = [str(col).strip() for col in df.iloc[4].values]
-    df_data = df_data.dropna(how="all")
+    # Read the cleaned uploader template directly using the header row
+    df_data = pd.read_excel(file)
 
-    account_col = df_data.columns[0]
-    df_data["Ledger Name"] = df_data[account_col].ffill()
+    # Standardize column names
+    df_data.columns = [str(col).strip() for col in df_data.columns]
 
-    date_col = next(
-        (col for col in df_data.columns if "date" in str(col).lower()), None
+    # Ensure required columns exist
+    required_cols = [
+        "Classification",
+        "Distribution account",
+        "Transaction date",
+        "Amount",
+    ]
+    for req in required_cols:
+      if req not in df_data.columns:
+        st.error(f"Missing required column in Transaction Detail: {req}")
+        return None
+
+    # Parse Dates and Amounts
+    df_data["Transaction date"] = pd.to_datetime(
+        df_data["Transaction date"], errors="coerce"
     )
-    amount_col = next(
-        (col for col in df_data.columns if "amount" in str(col).lower()), None
+    df_data = df_data.dropna(subset=["Transaction date"])
+
+    df_data["Amount"] = pd.to_numeric(df_data["Amount"], errors="coerce").fillna(
+        0.0
     )
 
-    if not date_col or not amount_col:
-      return None
-
-    df_data = df_data.dropna(subset=[date_col])
-    df_data["Date"] = pd.to_datetime(df_data[date_col], errors="coerce")
-    df_data = df_data.dropna(subset=["Date"])
-
-    df_data["Amount"] = (
-        df_data[amount_col]
-        .astype(str)
-        .str.replace(",", "")
-        .str.replace("$", "")
-        .astype(float)
+    # Add helper fields for filtering and grouping
+    df_data["Year"] = df_data["Transaction date"].dt.year
+    df_data["Month-Year"] = (
+        df_data["Transaction date"].dt.to_period("M").astype(str)
     )
-    df_data["Year"] = df_data["Date"].dt.year
-    df_data["Month-Year"] = df_data["Date"].dt.to_period("M").astype(str)
 
-    for col, default_val in [
-        ("Name", "Unassigned"),
-        ("Transaction type", "General"),
-    ]:
-      if col not in df_data.columns:
-        df_data[col] = default_val
-      else:
-        df_data[col] = df_data[col].fillna(default_val)
+    # Map missing text fields
+    if "Name" not in df_data.columns:
+      df_data["Name"] = "Unassigned"
+    else:
+      df_data["Name"] = df_data["Name"].fillna("Unassigned")
+
+    if "Transaction type" not in df_data.columns:
+      df_data["Transaction type"] = "General"
+    else:
+      df_data["Transaction type"] = df_data["Transaction type"].fillna(
+          "General"
+      )
 
     return df_data
   except Exception as e:
@@ -308,6 +322,7 @@ df_td = load_td(td_file) if td_file else None
 
 # --- SIDEBAR DYNAMIC FILTERS ---
 selected_year = 2026
+selected_classification = "All Classifications"
 selected_ledger = "All Accounts"
 selected_vendor = "All Vendors"
 
@@ -317,13 +332,24 @@ if df_td is not None:
   selected_year = st.sidebar.selectbox("Reporting Year", years)
   df_filtered_td = df_td[df_td["Year"] == selected_year]
 
-  ledgers = ["All Accounts"] + sorted(
-      df_filtered_td["Ledger Name"].astype(str).unique().tolist()
+  classifications = ["All Classifications"] + sorted(
+      df_filtered_td["Classification"].astype(str).unique().tolist()
   )
-  selected_ledger = st.sidebar.selectbox("Filter by Ledger Account", ledgers)
+  selected_classification = st.sidebar.selectbox(
+      "Filter by Statement Classification", classifications
+  )
+  if selected_classification != "All Classifications":
+    df_filtered_td = df_filtered_td[
+        df_filtered_td["Classification"] == selected_classification
+    ]
+
+  ledgers = ["All Accounts"] + sorted(
+      df_filtered_td["Distribution account"].astype(str).unique().tolist()
+  )
+  selected_ledger = st.sidebar.selectbox("Filter by Distribution Account", ledgers)
   if selected_ledger != "All Accounts":
     df_filtered_td = df_filtered_td[
-        df_filtered_td["Ledger Name"] == selected_ledger
+        df_filtered_td["Distribution account"] == selected_ledger
     ]
 
   vendors = ["All Vendors"] + sorted(
@@ -521,7 +547,7 @@ if df_filtered_td is not None:
         unsafe_allow_html=True,
     )
 else:
-  st.info("Upload Transaction Detail report to view cashflow analytics.")
+  st.info("Upload Transaction Detail / General Ledger report to view cashflow analytics.")
 
 # --- SECTION 3: BALANCE SHEET VIEWER ---
 if df_bs is not None:
