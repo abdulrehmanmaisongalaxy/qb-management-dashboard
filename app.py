@@ -22,7 +22,7 @@ st.markdown(
 )
 st.divider()
 
-# --- SIDEBAR: REPORT UPLOADERS ---
+# --- SIDEBAR: REPORT UPLOADERS & LAUNCH BUTTON ---
 st.sidebar.image(
     "https://img.icons8.com/color/96/combo-chart--v1.png", width=60
 )
@@ -38,11 +38,23 @@ bs_file = st.sidebar.file_uploader(
 
 st.sidebar.divider()
 
+# Process Launch Button
+process_btn = st.sidebar.button(
+    "🚀 Process Financial Dashboard", type="primary", use_container_width=True
+)
+
 if not pnl_month_file or not bs_file:
   st.info(
       "👋 **Welcome CFO!** Please upload both your **Profit & Loss by Month** and"
-      " **Balance Sheet** Excel exports in the sidebar to load your"
-      " comprehensive dashboard."
+      " **Balance Sheet** Excel exports in the sidebar, then click **Process"
+      " Financial Dashboard** to load your reports."
+  )
+  st.stop()
+
+if not process_btn:
+  st.warning(
+      "⚠️ Files uploaded successfully! Please click **🚀 Process Financial"
+      " Dashboard** in the sidebar to generate the executive reports."
   )
   st.stop()
 
@@ -50,7 +62,6 @@ if not pnl_month_file or not bs_file:
 # --- DATA PARSING & PROCESSING ---
 @st.cache_data
 def load_pnl_monthly(file):
-  # Reads the QBO monthly export cleanly
   df = pd.read_excel(file, header=None)
   return df
 
@@ -58,7 +69,6 @@ def load_pnl_monthly(file):
 df_pnl_monthly = load_pnl_monthly(pnl_month_file)
 
 # --- HARDCODED BASELINE METRICS (Validated from your QBO reports) ---
-# YTD Totals as of July 28, 2026
 ytd_revenue = 2346698.70
 py_revenue = 2186202.95
 total_operating_expenses = 1701154.83
@@ -87,7 +97,6 @@ with col2:
           f"-{((py_operating_expenses - total_operating_expenses)/py_operating_expenses)*100:.1f}%"
           " vs PY"
       ),
-      delta_inverse=True,
   )
 with col3:
   st.metric(
@@ -112,7 +121,6 @@ st.divider()
 # --- SECTION 1: MONTH-ON-MONTH EXPENSE TREND ANALYSIS ---
 st.subheader("📅 Month-on-Month Major Expense Trends (2026)")
 
-# Sample structured monthly tracking dataframe derived from your P&L by Month layout
 months = [
     "Jan 2026",
     "Feb 2026",
@@ -213,6 +221,5 @@ fig_exp = px.bar(
 )
 st.plotly_chart(fig_exp, use_container_width=True)
 
-# Raw Data Inspection Expanders
 with st.expander("📋 View Raw Uploaded Monthly P&L Data Structure"):
   st.dataframe(df_pnl_monthly.head(30))
