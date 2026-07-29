@@ -1,8 +1,6 @@
 import io
 import os
 import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
 import streamlit as st
 
 # Page Configuration
@@ -38,7 +36,6 @@ bs_file = st.sidebar.file_uploader(
 
 st.sidebar.divider()
 
-# Process Launch Button
 process_btn = st.sidebar.button(
     "🚀 Process Financial Dashboard", type="primary", use_container_width=True
 )
@@ -118,75 +115,62 @@ with col4:
 
 st.divider()
 
-# --- SECTION 1: MONTH-ON-MONTH EXPENSE TREND ANALYSIS ---
+# --- SECTION 1: MONTH-ON-MONTH EXPENSE TREND ANALYSIS (Native Streamlit) ---
 st.subheader("📅 Month-on-Month Major Expense Trends (2026)")
 
-months = [
-    "Jan 2026",
-    "Feb 2026",
-    "Mar 2026",
-    "Apr 2026",
-    "May 2026",
-    "Jun 2026",
-    "Jul 2026",
-]
-
-mom_data = {
-    "Month": months * 4,
-    "Category": (
-        ["Payroll Expenses"] * 7
-        + ["Professional Fees"] * 7
-        + ["Computer & Internet"] * 7
-        + ["Travel Expense"] * 7
-    ),
-    "Amount": [
-        # Payroll
-        210581.45,
-        213759.57,
-        217735.81,
-        252380.17,
-        290740.78,
-        179126.10,
-        171526.29,
-        # Professional Fees
-        4761.47,
-        1500.00,
-        8000.00,
-        3501.10,
-        11186.00,
-        131.00,
-        1850.00,
-        # Computer & IT
-        4724.78,
-        4400.41,
-        4548.21,
-        3856.40,
-        3747.78,
-        2294.33,
-        1510.23,
-        # Travel
-        114.62,
-        1388.38,
-        1211.66,
-        1231.10,
-        1743.00,
-        1835.36,
-        1425.89,
+# Create a clean pivot table for native charting
+chart_data = pd.DataFrame(
+    {
+        "Payroll Expenses": [
+            210581.45,
+            213759.57,
+            217735.81,
+            252380.17,
+            290740.78,
+            179126.10,
+            171526.29,
+        ],
+        "Professional Fees": [
+            4761.47,
+            1500.00,
+            8000.00,
+            3501.10,
+            11186.00,
+            131.00,
+            1850.00,
+        ],
+        "Computer & IT": [
+            4724.78,
+            4400.41,
+            4548.21,
+            3856.40,
+            3747.78,
+            2294.33,
+            1510.23,
+        ],
+        "Travel Expense": [
+            114.62,
+            1388.38,
+            1211.66,
+            1231.10,
+            1743.00,
+            1835.36,
+            1425.89,
+        ],
+    },
+    index=[
+        "Jan 2026",
+        "Feb 2026",
+        "Mar 2026",
+        "Apr 2026",
+        "May 2026",
+        "Jun 2026",
+        "Jul 2026",
     ],
-}
-
-df_mom = pd.DataFrame(mom_data)
-
-fig_mom = px.bar(
-    df_mom,
-    x="Month",
-    y="Amount",
-    color="Category",
-    title="Monthly Burn & Major Cost Drivers by Category",
-    labels={"Amount": "Expense Amount ($)", "Month": "2026 Operating Month"},
-    barmode="stack",
+>
 )
-st.plotly_chart(fig_mom, use_container_width=True)
+
+st.bar_chart(chart_data)
 
 st.divider()
 
@@ -208,18 +192,9 @@ expense_summary = pd.DataFrame({
         9866.01,
         95050.09,
     ],
-})
+}).set_index("Category")
 
-fig_exp = px.bar(
-    expense_summary.sort_values(by="Amount", ascending=True),
-    x="Amount",
-    y="Category",
-    orientation="h",
-    title="YTD Major Operating Expenses ($)",
-    color="Amount",
-    color_continuous_scale="Reds",
-)
-st.plotly_chart(fig_exp, use_container_width=True)
+st.bar_chart(expense_summary, horizontal=True)
 
 with st.expander("📋 View Raw Uploaded Monthly P&L Data Structure"):
   st.dataframe(df_pnl_monthly.head(30))
