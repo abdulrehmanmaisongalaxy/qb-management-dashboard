@@ -9,10 +9,11 @@ st.set_page_config(
 )
 
 # --- EXECUTIVE HEADER ---
-st.title("📊 FinancePilot | CFO Decision Support Portal")
+st.title("📊 FinancePilot | SIMA CFO Dashboard Portal")
 st.markdown("### Executive Financial Performance & Management Dashboard")
 st.markdown(
     "**Developed for: Social Investment Managers & Advisors LLC**  \n*Focus:"
+    "**Developed by: Abdul Rehman - VP & CFO**  \n*Focus:"
     " Executive Snapshot, Monthly P&L Trends, Major Expense Categories & Balance"
     " Sheet Position*"
 )
@@ -218,7 +219,57 @@ st.markdown(html_table, unsafe_allow_html=True)
 
 st.divider()
 
-# --- SECTION 2: AI-STYLE EXECUTIVE HIGHLIGHTS ---
+# --- SECTION 2: SUMMARIZED YTD COST DRIVER BREAKDOWN ---
+st.subheader("📉 YTD Major Cost Drivers Breakdown")
+
+html_summary = """
+<table class="cfo-table">
+    <thead>
+        <tr>
+            <th style="text-align: left;">Cost Driver Category</th>
+            <th style="text-align: right;">YTD Spend ($)</th>
+            <th style="text-align: right;">% of Operating Expenses</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>Payroll Expenses</td>
+            <td>$1,604,745.37</td>
+            <td>94.3%</td>
+        </tr>
+        <tr>
+            <td>Professional Fees</td>
+            <td>$41,898.31</td>
+            <td>2.5%</td>
+        </tr>
+        <tr>
+            <td>Computer & Internet</td>
+            <td>$25,082.14</td>
+            <td>1.5%</td>
+        </tr>
+        <tr>
+            <td>Travel Expense</td>
+            <td>$9,866.01</td>
+            <td>0.6%</td>
+        </tr>
+        <tr>
+            <td>Corporate Tax / Other Overhead</td>
+            <td>$19,563.00</td>
+            <td>1.1%</td>
+        </tr>
+        <tr style="font-weight: bold; background-color: #f8f9fa;">
+            <td>Total Operating Expenses</td>
+            <td>$1,701,154.83</td>
+            <td>100.0%</td>
+        </tr>
+    </tbody>
+</table>
+"""
+st.markdown(html_summary, unsafe_allow_html=True)
+
+st.divider()
+
+# --- SECTION 3: AI-STYLE EXECUTIVE HIGHLIGHTS ---
 st.subheader("💡 Executive Observations & Highlights")
 st.markdown("""
 - **Revenue Performance:** Total revenue increased by **7.3%** compared to the same period last year, driven by strong core operations.
@@ -226,7 +277,3 @@ st.markdown("""
 - **Profitability Expansion:** Net Income surged by **164.7%** compared to prior year, significantly improving operating margins.
 - **Liquidity & Runway:** Cash reserves maintain a healthy **8.2 months** of operational runway with stable working capital ($2.01M).
 """)
-
-with st.expander("📋 View Raw Uploaded P&L File Preview"):
-  df_preview = pd.read_excel(pnl_month_file, header=None)
-  st.dataframe(df_preview.head(25))
