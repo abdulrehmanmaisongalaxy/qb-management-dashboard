@@ -23,49 +23,11 @@ st.markdown(
 st.divider()
 
 
-# --- HELPER: GENERATE DOWNLOADABLE TEMPLATE ---
+# --- HELPER: GENERATE DOWNLOADABLE UNIFIED TEMPLATE ---
 def generate_sample_template():
   output = io.BytesIO()
   with pd.ExcelWriter(output, engine="openpyxl") as writer:
-    # 1. PNL Sheet template
-    pnl_df = pd.DataFrame([
-        ["Social Investment Managers & Advisors LLC", "", ""],
-        ["Profit & Loss Comparison", "", ""],
-        ["For the period ended", "", ""],
-        ["", "", ""],
-        ["Accrual Basis", "", ""],
-        ["Category", "YTD_2026", "YTD_2025"],
-        ["Income", 0.0, 0.0],
-        ["Consulting Income", 203434.33, 50704.00],
-        ["Grant Income", 218750.00, 348147.56],
-        ["Total for Income", 2346698.70, 2186202.95],
-        ["Gross Profit", 2346698.70, 2186202.95],
-        ["Expenses", 0.0, 0.0],
-        ["Software Expenses", 1578.89, 74.99],
-        ["Employee Salaries", 1282550.36, 1180557.52],
-        ["Total for Expenses", 1701154.83, 1753331.46],
-        ["Net Income", 550493.78, 207973.99],
-    ])
-    pnl_df.to_excel(
-        writer, sheet_name="Profit and Loss Comparison", index=False, header=False
-    )
-
-    # 2. Balance Sheet template
-    bs_df = pd.DataFrame([
-        ["Social Investment Managers & Advisors LLC", ""],
-        ["Balance Sheet", ""],
-        ["As of July 2026", ""],
-        ["", ""],
-        ["Account", "Balance"],
-        ["Checking & Savings", 473065.26],
-        ["Total Assets", 4945329.85],
-        ["Total Equity", 3325415.33],
-    ])
-    bs_df.to_excel(
-        writer, sheet_name="Balance Sheet", index=False, header=False
-    )
-
-    # 3. Updated Transaction Detail template (Matching your General Ledger schema)
+    # Single unified template sheet matching your exact General Ledger schema
     td_df = pd.DataFrame([
         [
             "Classification",
@@ -104,15 +66,13 @@ def generate_sample_template():
             451597.01,
         ],
     ])
-    td_df.to_excel(
-        writer, sheet_name="Transaction Detail", index=False, header=False
-    )
+    td_df.to_excel(writer, sheet_name="Sheet1", index=False, header=False)
 
   output.seek(0)
   return output.getvalue()
 
 
-# --- SIDEBAR FORM FOR UPLOADS & TEMPLATE DOWNLOAD ---
+# --- SIDEBAR FORM FOR UNIFIED UPLOAD & TEMPLATE DOWNLOAD ---
 st.sidebar.image(
     "https://img.icons8.com/color/96/combo-chart--v1.png", width=60
 )
@@ -120,14 +80,14 @@ st.sidebar.header("Reports Management")
 
 template_bytes = generate_sample_template()
 st.sidebar.download_button(
-    label="📥 Download Standard Template",
+    label="📥 Download Unified Template",
     data=template_bytes,
-    file_name="CFO_Dashboard_Template.xlsx",
+    file_name="Uploading Template.xlsx",
     mime=(
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     ),
     help=(
-        "Download this template, fill in your data, and upload the files"
+        "Download this standard template, fill in your GL data, and upload it"
         " below."
     ),
 )
@@ -135,15 +95,9 @@ st.sidebar.download_button(
 st.sidebar.divider()
 
 with st.sidebar.form("upload_form"):
-  st.markdown("Upload all 3 QuickBooks reports below:")
-  uploaded_pnl = st.file_uploader(
-      "Profit & Loss Comparison (.xlsx)", type=["xlsx", "xls"], key="pnl_in"
-  )
-  uploaded_bs = st.file_uploader(
-      "Balance Sheet (.xlsx)", type=["xlsx", "xls"], key="bs_in"
-  )
-  uploaded_td = st.file_uploader(
-      "Transaction Detail / GL (.xlsx)", type=["xlsx", "xls"], key="td_in"
+  st.markdown("Upload your standardized General Ledger file:")
+  uploaded_file = st.file_uploader(
+      "Uploading Template (.xlsx)", type=["xlsx", "xls"], key="gl_in"
   )
 
   submitted = st.form_submit_button(
@@ -151,119 +105,24 @@ with st.sidebar.form("upload_form"):
   )
 
 if submitted:
-  if uploaded_pnl is not None:
-    st.session_state["pnl_file"] = uploaded_pnl
-  if uploaded_bs is not None:
-    st.session_state["bs_file"] = uploaded_bs
-  if uploaded_td is not None:
-    st.session_state["td_file"] = uploaded_td
+  if uploaded_file is not None:
+    st.session_state["gl_file"] = uploaded_file
 
-pnl_file = st.session_state.get("pnl_file", None)
-bs_file = st.session_state.get("bs_file", None)
-td_file = st.session_state.get("td_file", None)
+gl_file = st.session_state.get("gl_file", None)
 
-if not pnl_file and not bs_file and not td_file:
+if not gl_file:
   st.info(
-      "👋 **Welcome CFO!** Download the standard template above, populate your"
-      " numbers, upload them in the sidebar form, and click **'Process & Load"
-      " Dashboard'**."
+      "👋 **Welcome CFO!** Download the unified template above, populate your"
+      " General Ledger data, upload it in the sidebar form, and click **'Process"
+      " & Load Dashboard'**."
   )
   st.stop()
 
 
-# --- ROBUST QUICKBOOKS DATA LOADERS ---
+# --- ROBUST UNIFIED GENERAL LEDGER DATA LOADER ---
 @st.cache_data
-def load_pnl(file):
+def load_gl_data(file):
   try:
-    df = pd.read_excel(file, header=None)
-    header_row_idx = None
-    for idx, row in df.iterrows():
-      row_str = row.astype(str).str.lower().values
-      if any("category" in s or "account" in s for s in row_str):
-        header_row_idx = idx
-        break
-
-    if header_row_idx is None:
-      header_row_idx = 5
-
-    df_data = df.iloc[header_row_idx + 1 :].copy()
-
-    if df_data.shape[1] >= 3:
-      df_data = df_data.iloc[:, [0, 1, 2]]
-      df_data.columns = ["Category", "YTD_2026", "YTD_2025"]
-    elif df_data.shape[1] == 2:
-      df_data.columns = ["Category", "YTD_2026"]
-      df_data["YTD_2025"] = 0.0
-    else:
-      return None
-
-    df_data = df_data.dropna(subset=["Category"])
-    df_data = df_data[
-        ~df_data["Category"]
-        .astype(str)
-        .str.contains(
-            "Accrual Basis|Cash Basis|Prepared|Table|Report",
-            case=False,
-            na=False,
-        )
-    ]
-
-    for col in ["YTD_2026", "YTD_2025"]:
-      if col in df_data.columns:
-        df_data[col] = (
-            df_data[col]
-            .astype(str)
-            .str.replace(",", "")
-            .str.replace("$", "")
-            .str.replace("—", "0")
-            .str.strip()
-        )
-        df_data[col] = pd.to_numeric(df_data[col], errors="coerce").fillna(0.0)
-
-    return df_data
-  except Exception as e:
-    st.error(f"Error loading P&L: {e}")
-    return None
-
-
-@st.cache_data
-def load_bs(file):
-  try:
-    df = pd.read_excel(file, header=None)
-    df_data = df.iloc[4:].copy()
-    if df_data.shape[1] >= 2:
-      df_data = df_data.iloc[:, [0, 1]]
-      df_data.columns = ["Account", "Balance"]
-    else:
-      df_data.columns = ["Account"]
-      df_data["Balance"] = 0.0
-
-    df_data = df_data.dropna(subset=["Account"])
-    df_data = df_data[
-        ~df_data["Account"]
-        .astype(str)
-        .str.contains("Accrual Basis|Cash Basis|Prepared", case=False, na=False)
-    ]
-    df_data["Balance"] = (
-        df_data["Balance"]
-        .astype(str)
-        .str.replace(",", "")
-        .str.replace("$", "")
-        .str.replace("—", "0")
-    )
-    df_data["Balance"] = pd.to_numeric(
-        df_data["Balance"], errors="coerce"
-    ).fillna(0.0)
-    return df_data
-  except Exception as e:
-    st.error(f"Error loading Balance Sheet: {e}")
-    return None
-
-
-@st.cache_data
-def load_td(file):
-  try:
-    # Read the cleaned uploader template directly using the header row
     df_data = pd.read_excel(file)
 
     # Standardize column names
@@ -278,7 +137,7 @@ def load_td(file):
     ]
     for req in required_cols:
       if req not in df_data.columns:
-        st.error(f"Missing required column in Transaction Detail: {req}")
+        st.error(f"Missing required column in uploaded template: {req}")
         return None
 
     # Parse Dates and Amounts
@@ -290,6 +149,10 @@ def load_td(file):
     df_data["Amount"] = pd.to_numeric(df_data["Amount"], errors="coerce").fillna(
         0.0
     )
+    if "Balance" in df_data.columns:
+      df_data["Balance"] = pd.to_numeric(
+          df_data["Balance"], errors="coerce"
+      ).fillna(0.0)
 
     # Add helper fields for filtering and grouping
     df_data["Year"] = df_data["Transaction date"].dt.year
@@ -297,28 +160,26 @@ def load_td(file):
         df_data["Transaction date"].dt.to_period("M").astype(str)
     )
 
-    # Map missing text fields
-    if "Name" not in df_data.columns:
-      df_data["Name"] = "Unassigned"
-    else:
-      df_data["Name"] = df_data["Name"].fillna("Unassigned")
-
-    if "Transaction type" not in df_data.columns:
-      df_data["Transaction type"] = "General"
-    else:
-      df_data["Transaction type"] = df_data["Transaction type"].fillna(
-          "General"
-      )
+    # Map missing text fields safely
+    for col, default_val in [
+        ("Name", "Unassigned"),
+        ("Transaction type", "General"),
+        ("Description", ""),
+        ("Split", ""),
+        ("Num", ""),
+    ]:
+      if col not in df_data.columns:
+        df_data[col] = default_val
+      else:
+        df_data[col] = df_data[col].fillna(default_val)
 
     return df_data
   except Exception as e:
-    st.error(f"Error loading Transaction Detail: {e}")
+    st.error(f"Error loading General Ledger data: {e}")
     return None
 
 
-df_pnl = load_pnl(pnl_file) if pnl_file else None
-df_bs = load_bs(bs_file) if bs_file else None
-df_td = load_td(td_file) if td_file else None
+df_gl = load_gl_data(gl_file) if gl_file else None
 
 # --- SIDEBAR DYNAMIC FILTERS ---
 selected_year = 2026
@@ -326,177 +187,138 @@ selected_classification = "All Classifications"
 selected_ledger = "All Accounts"
 selected_vendor = "All Vendors"
 
-if df_td is not None:
+if df_gl is not None:
   st.sidebar.subheader("🔍 CFO Filter Controls")
-  years = sorted(df_td["Year"].unique(), reverse=True)
+  years = sorted(df_gl["Year"].unique(), reverse=True)
   selected_year = st.sidebar.selectbox("Reporting Year", years)
-  df_filtered_td = df_td[df_td["Year"] == selected_year]
+  df_filtered = df_gl[df_gl["Year"] == selected_year]
 
   classifications = ["All Classifications"] + sorted(
-      df_filtered_td["Classification"].astype(str).unique().tolist()
+      df_filtered["Classification"].astype(str).unique().tolist()
   )
   selected_classification = st.sidebar.selectbox(
       "Filter by Statement Classification", classifications
   )
   if selected_classification != "All Classifications":
-    df_filtered_td = df_filtered_td[
-        df_filtered_td["Classification"] == selected_classification
+    df_filtered = df_filtered[
+        df_filtered["Classification"] == selected_classification
     ]
 
   ledgers = ["All Accounts"] + sorted(
-      df_filtered_td["Distribution account"].astype(str).unique().tolist()
+      df_filtered["Distribution account"].astype(str).unique().tolist()
   )
   selected_ledger = st.sidebar.selectbox("Filter by Distribution Account", ledgers)
   if selected_ledger != "All Accounts":
-    df_filtered_td = df_filtered_td[
-        df_filtered_td["Distribution account"] == selected_ledger
+    df_filtered = df_filtered[
+        df_filtered["Distribution account"] == selected_ledger
     ]
 
   vendors = ["All Vendors"] + sorted(
-      df_filtered_td["Name"].astype(str).unique().tolist()
+      df_filtered["Name"].astype(str).unique().tolist()
   )
   selected_vendor = st.sidebar.selectbox("Filter by Vendor / Payee", vendors)
   if selected_vendor != "All Vendors":
-    df_filtered_td = df_filtered_td[df_filtered_td["Name"] == selected_vendor]
+    df_filtered = df_filtered[df_filtered["Name"] == selected_vendor]
 else:
-  df_filtered_td = None
+  df_filtered = None
 
-# --- EXECUTIVE FINANCIAL KPIS ---
+# --- EXECUTIVE FINANCIAL KPIS (Calculated directly from GL Data) ---
 st.subheader("📌 Executive Financial Position & Performance")
 
 col1, col2, col3, col4, col5 = st.columns(5)
 
-total_rev_2026 = (
-    df_pnl[
-        df_pnl["Category"].str.contains("Total for Income", case=False, na=False)
-    ]["YTD_2026"].values[0]
-    if df_pnl is not None
-    else 2346698.70
+# Calculate metrics dynamically from the full GL upload
+total_rev = (
+    df_gl[df_gl["Classification"] == "Revenue"]["Amount"].sum()
+    if df_gl is not None
+    else 0.0
 )
-total_rev_2025 = (
-    df_pnl[
-        df_pnl["Category"].str.contains("Total for Income", case=False, na=False)
-    ]["YTD_2025"].values[0]
-    if df_pnl is not None
-    else 2186202.95
+total_exp = (
+    df_gl[df_gl["Classification"] == "Expense"]["Amount"].sum()
+    if df_gl is not None
+    else 0.0
 )
-rev_growth = (
-    ((total_rev_2026 - total_rev_2025) / total_rev_2025) * 100
-    if total_rev_2025 > 0
-    else 0
-)
+net_income = total_rev + total_exp  # expenses are negative amounts
 
-net_profit_2026 = (
-    df_pnl[df_pnl["Category"].str.strip() == "Net Income"]["YTD_2026"].values[0]
-    if df_pnl is not None
-    else 550493.78
+total_assets = (
+    df_gl[df_gl["Classification"] == "Asset"]["Balance"].iloc[-1]
+    if df_gl is not None and not df_gl[df_gl["Classification"] == "Asset"].empty
+    else 0.0
 )
-net_profit_2025 = (
-    df_pnl[df_pnl["Category"].str.strip() == "Net Income"]["YTD_2025"].values[0]
-    if df_pnl is not None
-    else 207973.99
-)
-np_growth = (
-    ((net_profit_2026 - net_profit_2025) / net_profit_2025) * 100
-    if net_profit_2025 > 0
-    else 0
+total_liabilities = (
+    df_gl[df_gl["Classification"] == "Liability"]["Balance"].iloc[-1]
+    if df_gl is not None
+    and not df_gl[df_gl["Classification"] == "Liability"].empty
+    else 0.0
 )
 
 with col1:
-  st.metric(
-      label="Total Revenue (YTD)",
-      value=f"${total_rev_2026:,.2f}",
-      delta=f"+{rev_growth:.1f}% YoY",
-  )
+  st.metric(label="Total Revenue (YTD)", value=f"${total_rev:,.2f}")
 with col2:
-  st.metric(
-      label="Net Income (YTD)",
-      value=f"${net_profit_2026:,.2f}",
-      delta=f"+{np_growth:.1f}% YoY",
-  )
+  st.metric(label="Net Income (YTD)", value=f"${net_income:,.2f}")
 with col3:
   st.metric(
-      label="Cash & Bank Position",
-      value="$473,065.26",
-      delta="Checking & Savings",
+      label="Total Outflows / Expenses", value=f"${abs(total_exp):,.2f}"
   )
 with col4:
-  st.metric(
-      label="Total Assets", value="$4,945,329.85", delta="Balance Sheet"
-  )
+  st.metric(label="Total Tracked Assets", value=f"${total_assets:,.2f}")
 with col5:
-  st.metric(
-      label="Total Equity", value="$3,325,415.33", delta="Strong Capital"
-  )
+  st.metric(label="Total Tracked Liabilities", value=f"${total_liabilities:,.2f}")
 
 st.divider()
 
-# --- SECTION 1: P&L COMPARISON & YOY VARIANCES ---
-st.subheader("📈 Profit & Loss Comparison & YoY Variance Analysis")
+# --- SECTION 1: ACCOUNT CLASSIFICATION & BREAKDOWN ---
+st.subheader(
+    "📈 General Ledger Breakdown by Classification & Account Dynamics"
+)
 
-if df_pnl is not None:
-  exclude_keywords = (
-      "Total|Income|Expenses|Profit|Net|Gross|Operating|Earnings"
-  )
-  pnl_chart_df = df_pnl[
-      ~df_pnl["Category"].astype(str).str.contains(exclude_keywords, case=True)
-  ]
-  pnl_chart_df = pnl_chart_df[
-      (pnl_chart_df["YTD_2026"] != 0) | (pnl_chart_df["YTD_2025"] != 0)
-  ]
-
+if df_filtered is not None:
   p1, p2 = st.columns(2)
   with p1:
-    if not pnl_chart_df.empty:
-      top_pnl = (
-          pnl_chart_df.sort_values(by="YTD_2026", ascending=False)
-          .head(10)
-          .copy()
-      )
-      fig_pnl_top = px.bar(
-          top_pnl,
-          x="YTD_2026",
-          y="Category",
-          orientation="h",
-          title="Top P&L Line-Item Accounts (YTD 2026)",
-          labels={"YTD_2026": "Amount ($)", "Category": "Account"},
-          color="YTD_2026",
-          color_continuous_scale="Blues",
-      )
-      fig_pnl_top.update_layout(yaxis={"categoryorder": "total ascending"})
-      st.plotly_chart(fig_pnl_top, use_container_width=True)
-    else:
-      st.info("No individual line items available for charting.")
+    class_summary = (
+        df_filtered.groupby("Classification")["Amount"].sum().reset_index()
+    )
+    fig_class = px.bar(
+        class_summary,
+        x="Classification",
+        y="Amount",
+        title=f"Net Movement by Financial Classification ({selected_year})",
+        labels={"Amount": "Net Amount ($)", "Classification": "Category"},
+        color="Classification",
+        color_discrete_sequence=px.colors.qualitative.Prism,
+    )
+    st.plotly_chart(fig_class, use_container_width=True)
 
   with p2:
-    display_pnl = df_pnl.copy()
-    if "YTD_2025" in display_pnl.columns and "YTD_2026" in display_pnl.columns:
-      display_pnl["Variance ($)"] = (
-          display_pnl["YTD_2026"] - display_pnl["YTD_2025"]
-      )
-      display_pnl["Variance (%)"] = (
-          (display_pnl["Variance ($)"] / display_pnl["YTD_2025"].replace(0, 1))
-          * 100
-      ).round(1)
-
-    st.markdown("**Complete P&L Comparative Statement (2026 vs 2025)**")
-    st.markdown(
-        display_pnl.to_html(index=False, classes="table table-striped"),
-        unsafe_allow_html=True,
+    top_accounts = (
+        df_filtered.groupby("Distribution account")["Amount"]
+        .sum()
+        .reset_index()
     )
-else:
-  st.info("Upload Profit & Loss report to view analytics.")
+    top_accounts = top_accounts.sort_values(
+        by="Amount", ascending=True
+    ).head(10)
+    fig_acc = px.bar(
+        top_accounts,
+        x="Amount",
+        y="Distribution account",
+        orientation="h",
+        title=f"Top Distribution Accounts by Activity ({selected_year})",
+        labels={"Amount": "Amount ($)", "Distribution account": "Account"},
+        color="Amount",
+        color_continuous_scale="Blues",
+    )
+    st.plotly_chart(fig_acc, use_container_width=True)
 
-st.divider()
+  st.divider()
 
-# --- SECTION 2: TRANSACTION LEVEL EXPENSE & CASHFLOW DYNAMICS ---
-if df_filtered_td is not None:
+  # --- SECTION 2: VENDOR & CASHFLOW MONITORING ---
   st.subheader(
-      f"📉 Expense Analysis & Cashflow Monitoring ({selected_year})"
+      f"📉 Vendor Outflows & Monthly Cashflow Dynamics ({selected_year})"
   )
 
-  income_df = df_filtered_td[df_filtered_td["Amount"] > 0]
-  expense_df = df_filtered_td[df_filtered_td["Amount"] < 0]
+  income_df = df_filtered[df_filtered["Amount"] > 0]
+  expense_df = df_filtered[df_filtered["Amount"] < 0]
 
   e1, e2 = st.columns(2)
   with e1:
@@ -543,16 +365,8 @@ if df_filtered_td is not None:
 
   with st.expander("📋 View Detailed Filtered Transaction Ledger"):
     st.markdown(
-        df_filtered_td.to_html(index=False, classes="table table-striped"),
+        df_filtered.to_html(index=False, classes="table table-striped"),
         unsafe_allow_html=True,
     )
 else:
-  st.info("Upload Transaction Detail / General Ledger report to view cashflow analytics.")
-
-# --- SECTION 3: BALANCE SHEET VIEWER ---
-if df_bs is not None:
-  with st.expander("🏛️ View Full Balance Sheet Report"):
-    st.markdown(
-        df_bs.to_html(index=False, classes="table table-striped"),
-        unsafe_allow_html=True,
-    )
+  st.info("Upload your 'Uploading Template.xlsx' file to view analytics.")
