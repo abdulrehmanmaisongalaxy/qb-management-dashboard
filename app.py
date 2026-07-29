@@ -115,84 +115,142 @@ with col4:
 
 st.divider()
 
-# --- SECTION 1: MONTH-ON-MONTH EXPENSE TREND ANALYSIS ---
+# --- SECTION 1: MONTH-ON-MONTH EXPENSE TREND TABLE (HTML Executive Grid) ---
 st.subheader("📅 Month-on-Month Major Expense Trends (2026)")
 
-chart_data = pd.DataFrame(
-    {
-        "Payroll Expenses": [
-            210581.45,
-            213759.57,
-            217735.81,
-            252380.17,
-            290740.78,
-            179126.10,
-            171526.29,
-        ],
-        "Professional Fees": [
-            4761.47,
-            1500.00,
-            8000.00,
-            3501.10,
-            11186.00,
-            131.00,
-            1850.00,
-        ],
-        "Computer & IT": [
-            4724.78,
-            4400.41,
-            4548.21,
-            3856.40,
-            3747.78,
-            2294.33,
-            1510.23,
-        ],
-        "Travel Expense": [
-            114.62,
-            1388.38,
-            1211.66,
-            1231.10,
-            1743.00,
-            1835.36,
-            1425.89,
-        ],
-    },
-    index=[
-        "Jan 2026",
-        "Feb 2026",
-        "Mar 2026",
-        "Apr 2026",
-        "May 2026",
-        "Jun 2026",
-        "Jul 2026",
-    ],
-)
+html_table = """
+<style>
+    .cfo-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-family: sans-serif;
+        font-size: 14px;
+        margin-top: 10px;
+        margin-bottom: 20px;
+    }
+    .cfo-table th {
+        background-color: #f8f9fa;
+        color: #333;
+        text-align: right;
+        padding: 10px;
+        border-bottom: 2px solid #dee2e6;
+    }
+    .cfo-table th:first-child {
+        text-align: left;
+    }
+    .cfo-table td {
+        padding: 9px 10px;
+        text-align: right;
+        border-bottom: 1px solid #eee;
+        color: #212529;
+    }
+    .cfo-table td:first-child {
+        text-align: left;
+        font-weight: 600;
+    }
+    .cfo-table tr:hover {
+        background-color: #f1f3f5;
+    }
+</style>
+<table class="cfo-table">
+    <thead>
+        <tr>
+            <th>Expense Category</th>
+            <th>Jan 2026</th>
+            <th>Feb 2026</th>
+            <th>Mar 2026</th>
+            <th>Apr 2026</th>
+            <th>May 2026</th>
+            <th>Jun 2026</th>
+            <th>Jul 2026</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>Payroll Expenses</td>
+            <td>$210,581.45</td>
+            <td>$213,759.57</td>
+            <td>$217,735.81</td>
+            <td>$252,380.17</td>
+            <td>$290,740.78</td>
+            <td>$179,126.10</td>
+            <td>$171,526.29</td>
+        </tr>
+        <tr>
+            <td>Professional Fees</td>
+            <td>$4,761.47</td>
+            <td>$1,500.00</td>
+            <td>$8,000.00</td>
+            <td>$3,501.10</td>
+            <td>$11,186.00</td>
+            <td>$131.00</td>
+            <td>$1,850.00</td>
+        </tr>
+        <tr>
+            <td>Computer & Internet</td>
+            <td>$4,724.78</td>
+            <td>$4,400.41</td>
+            <td>$4,548.21</td>
+            <td>$3,856.40</td>
+            <td>$3,747.78</td>
+            <td>$2,294.33</td>
+            <td>$1,510.23</td>
+        </tr>
+        <tr>
+            <td>Travel Expense</td>
+            <td>$114.62</td>
+            <td>$1,388.38</td>
+            <td>$1,211.66</td>
+            <td>$1,231.10</td>
+            <td>$1,743.00</td>
+            <td>$1,835.36</td>
+            <td>$1,425.89</td>
+        </tr>
+    </tbody>
+</table>
+"""
 
-st.bar_chart(chart_data)
+st.markdown(html_table, unsafe_allow_html=True)
 
 st.divider()
 
 # --- SECTION 2: MAJOR EXPENSE CATEGORY BREAKDOWN ---
 st.subheader("📉 YTD Major Cost Drivers Overview")
 
-expense_summary = pd.DataFrame({
-    "Category": [
-        "Payroll Expenses",
-        "Professional Fees",
-        "Computer & Internet",
-        "Travel Expense",
-        "Corporate Tax / Other",
-    ],
-    "Amount": [
-        1604745.37,
-        41898.31,
-        25082.14,
-        9866.01,
-        95050.09,
-    ],
-}).set_index("Category")
+html_summary = """
+<table class="cfo-table">
+    <thead>
+        <tr>
+            <th style="text-align: left;">Category</th>
+            <th style="text-align: right;">YTD Amount ($)</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>Payroll Expenses</td>
+            <td>$1,604,745.37</td>
+        </tr>
+        <tr>
+            <td>Professional Fees</td>
+            <td>$41,898.31</td>
+        </tr>
+        <tr>
+            <td>Computer & Internet</td>
+            <td>$25,082.14</td>
+        </tr>
+        <tr>
+            <td>Travel Expense</td>
+            <td>$9,866.01</td>
+        </tr>
+        <tr>
+            <td>Corporate Tax / Other</td>
+            <td>$95,050.09</td>
+        </tr>
+    </tbody>
+</table>
+"""
 
-st.bar_chart(expense_summary, horizontal=True)
+st.markdown(html_summary, unsafe_allow_html=True)
 
 with st.expander("📋 View Raw Uploaded Monthly P&L Data Structure"):
   st.dataframe(df_pnl_monthly.head(30))
