@@ -115,10 +115,9 @@ with col4:
 
 st.divider()
 
-# --- SECTION 1: MONTH-ON-MONTH EXPENSE TREND ANALYSIS (Native Streamlit) ---
+# --- SECTION 1: MONTH-ON-MONTH EXPENSE TREND ANALYSIS ---
 st.subheader("📅 Month-on-Month Major Expense Trends (2026)")
 
-# Create a clean pivot table for native charting
 chart_data = pd.DataFrame(
     {
         "Payroll Expenses": [
@@ -167,7 +166,6 @@ chart_data = pd.DataFrame(
         "Jun 2026",
         "Jul 2026",
     ],
->
 )
 
 st.bar_chart(chart_data)
